@@ -1,7 +1,6 @@
 const express = require('express');
 const multer = require('multer');
-const { OpenAI } = require('openai');
-const { Anthropic } = require('@anthropic-ai/sdk');
+const { OpenAI } = require('openai'); // We use this for BOTH Whisper and Gemini
 const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -11,6 +10,7 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 10000;
 
+// Directories
 const uploadsDir = path.join(__dirname, 'uploads');
 const clipsDir = path.join(__dirname, 'public', 'clips');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
@@ -26,8 +26,14 @@ const upload = multer({
   limits: { fileSize: 100 * 1024 * 1024 }
 });
 
+// 1. OpenAI Client (for Whisper)
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// 2. Google Gemini Client (using OpenAI compatibility)
+const gemini = new OpenAI({
+  apiKey: process.env.GOOGLE_API_KEY, // Use your Google API Key
+  baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
+});
 
 app.post('/api/analyze', upload.single('video'), async (req, res) => {
   const videoFile = req.file;
@@ -41,6 +47,7 @@ app.post('/api/analyze', upload.single('video'), async (req, res) => {
   const audioPath = path.join(uploadsDir, `${videoFile.filename}.mp3`);
   
   try {
+    // Extract Audio
     await new Promise((resolve, reject) => {
       exec(`ffmpeg -i "${videoFile.path}" -q:a 0 -map a "${audioPath}"`, (err) => {
         if (err) reject(new Error("FFmpeg audio extraction failed: " + err.message));
@@ -48,6 +55,7 @@ app.post('/api/analyze', upload.single('video'), async (req, res) => {
       });
     });
 
+    // Transcribe with Whisper
     const transcription = await openai.audio.transcriptions.create({
       file: fs.createReadStream(audioPath),
       model: "whisper-1",
@@ -61,23 +69,29 @@ app.post('/api/analyze', upload.single('video'), async (req, res) => {
       return `[${seg.start}s - ${seg.end}s]: ${seg.text}`;
     }).join('\n');
 
-    const aiResponse = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20241022",
-      max_tokens: 2000,
-      system: "You are an elite video content manager. Analyze the transcript timestamps. Isolate parts containing high energy, strong punchlines, or logical hooks. Return ONLY a valid JSON array of objects. No intro text, no backticks. Properties: title, startSeconds, endSeconds, reason, tags (array), viralScore (number 1-100).",
-      messages: [{ 
-        role: "user", 
-        content: `Target Goal: ${promptPreset}. Isolate exactly ${requestedCount} distinct highlights.\n\nTranscript:\n${scriptTimeline}` 
-      }],
+    // Analyze with Gemini
+    const aiResponse = await gemini.chat.completions.create({
+      model: "gemini-2.0-flash", // Use a fast, capable Gemini model
+      messages: [
+        { 
+          role: "system", 
+          content: "You are an elite video content manager. Analyze the transcript. Return ONLY a valid JSON array of objects. Properties: title, startSeconds, endSeconds, reason, tags (array), viralScore (number 1-100)." 
+        },
+        { 
+          role: "user", 
+          content: `Target Goal: ${promptPreset}. Isolate exactly ${requestedCount} distinct highlights.\n\nTranscript:\n${scriptTimeline}` 
+        }
+      ],
     });
 
-    let cleanedText = aiResponse.content[0].text.trim();
-    if (cleanedText.startsWith("```json")) cleanedText = cleanedText.replace(/^```json/, "");
-    if (cleanedText.endsWith("```")) cleanedText = cleanedText.replace(/```$/, "");
+    let cleanedText = aiResponse.choices[0].message.content.trim();
+    // Cleanup if model includes markdown
+    cleanedText = cleanedText.replace(/^```json/, "").replace(/```$/, "").trim();
     
-    const parsedClips = JSON.parse(cleanedText.trim());
+    const parsedClips = JSON.parse(cleanedText);
     const clipOutputs = [];
 
+    // Process Clips with FFmpeg
     for (let i = 0; i < parsedClips.length; i++) {
       const clip = parsedClips[i];
       const clipFilename = `clip_${Date.now()}_${i}.mp4`;
@@ -99,15 +113,14 @@ app.post('/api/analyze', upload.single('video'), async (req, res) => {
     }
 
     if (fs.existsSync(videoFile.path)) fs.unlinkSync(videoFile.path);
-
     res.json({ success: true, clips: clipOutputs });
 
   } catch (error) {
     console.error("Pipeline failure:", error);
     if (fs.existsSync(videoFile.path)) fs.unlinkSync(videoFile.path);
     if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
-    res.status(500).json({ error: error.message || "Failed to process structural video stream." });
+    res.status(500).json({ error: error.message || "Failed to process video." });
   }
 });
 
-app.listen(port, () => console.log(`ClipWave Server running secure on port ${port}`));
+app.listen(port, () => console.log(`ClipWave Server running on port ${port}`));
