@@ -9,7 +9,7 @@ const cors = require('cors');
 require('dotenv').config();
 
 const app = express();
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 10000;
 
 const uploadsDir = path.join(__dirname, 'uploads');
 const clipsDir = path.join(__dirname, 'public', 'clips');
