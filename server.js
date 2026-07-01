@@ -25,7 +25,7 @@ app.get('/auth/github/callback', async (req, res) => {
     const clientSecret = process.env.GITHUB_CLIENT_SECRET;
     
     // FIXED: Using environment variable instead of a hardcoded URL
-    const frontendDashboardUrl = process.env.FRONTEND_URL || 'https://YOUR_STACKBLITZ_URL.webcontainer.io';
+ const frontendDashboardUrl = 'https://stackblitzwebcontainerapistart-21vq--5173--29a3b5f7.local-credentialless.webcontainer.io';
 
     if (!code) return res.redirect(`${frontendDashboardUrl}?error=no_code_provided`);
 
