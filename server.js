@@ -89,6 +89,8 @@ app.post('/api/generate', async (req, res) => {
     res.json({ message: "AI Analysis Complete!", status: "success" });
 });
 
+// --- THIS IS THE PART YOU WERE MISSING ---
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, '0.0.0.0', () => console.log(`Backend live on port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Backend live on port ${PORT}`);
 });
