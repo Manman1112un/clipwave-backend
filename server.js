@@ -107,9 +107,49 @@ app.get('/auth/twitch/callback', async (req, res) => {
     }
 });
 
-// --- 4. AI CLIP GENERATOR ---
+// --- 4. REAL AI GENERATOR ---
 app.post('/api/generate', async (req, res) => {
-    res.json({ message: "AI Analysis Complete!", status: "success" });
+    try {
+        const { prompt } = req.body;
+
+        if (!prompt) {
+            return res.status(400).json({ error: "No prompt provided in request body" });
+        }
+
+        // We use the GEMINI_API_KEY from your environment variables
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+            return res.status(500).json({ error: "AI API key is missing on the server configuration" });
+        }
+
+        // Call the Gemini API directly using axios
+        const response = await axios.post(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+            {
+                contents: [{ parts: [{ text: prompt }] }]
+            },
+            {
+                headers: { 'Content-Type': 'application/json' }
+            }
+        );
+
+        // Extract the text response from Gemini's JSON structure
+        const aiResponse = response.data.candidates[0].content.parts[0].text;
+
+        // Send it back to your frontend!
+        res.json({ 
+            status: "success", 
+            message: aiResponse 
+        });
+
+    } catch (error) {
+        console.error("AI Generation Error:", error.response?.data || error.message);
+        res.status(500).json({ 
+            status: "error", 
+            message: "Failed to generate AI response",
+            details: error.message 
+        });
+    }
 });
 
 // TRAP 2: Catch random app crashes
