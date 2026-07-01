@@ -7,6 +7,9 @@ const app = express();
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
+// --- WE HARDCODE THE FRONTEND URL HERE TO BYPASS RENDER ISSUES ---
+const FRONTEND_URL = "https://stackblitzwebcontainerapistart-21vq--5173--29a3b5f7.local-credentialless.webcontainer.io";
+
 // --- 1. GITHUB OAUTH ---
 app.get('/auth/github', (req, res) => {
     const redirectUri = "https://clipwave-backend.onrender.com/auth/github/callback";
@@ -23,9 +26,9 @@ app.get('/auth/github/callback', async (req, res) => {
             redirect_uri: "https://clipwave-backend.onrender.com/auth/github/callback"
         }, { headers: { accept: 'application/json' }});
 
-        res.redirect(`${process.env.FRONTEND_URL}/?authed=true`);
+        res.redirect(`${FRONTEND_URL}/?authed=true`);
     } catch (e) {
-        res.redirect(`${process.env.FRONTEND_URL}/?error=github_failed`);
+        res.redirect(`${FRONTEND_URL}/?error=github_failed`);
     }
 });
 
@@ -45,9 +48,9 @@ app.get('/auth/google/callback', async (req, res) => {
             redirect_uri: "https://clipwave-backend.onrender.com/auth/google/callback",
             grant_type: 'authorization_code'
         });
-        res.redirect(`${process.env.FRONTEND_URL}/?authed=true`);
+        res.redirect(`${FRONTEND_URL}/?authed=true`);
     } catch (e) { 
-        res.redirect(`${process.env.FRONTEND_URL}/?error=google_failed`); 
+        res.redirect(`${FRONTEND_URL}/?error=google_failed`); 
     }
 });
 
@@ -69,9 +72,9 @@ app.get('/auth/twitch/callback', async (req, res) => {
                 redirect_uri: "https://clipwave-backend.onrender.com/auth/twitch/callback"
             }
         });
-        res.redirect(`${process.env.FRONTEND_URL}/?authed=true`);
+        res.redirect(`${FRONTEND_URL}/?authed=true`);
     } catch (e) { 
-        res.redirect(`${process.env.FRONTEND_URL}/?error=twitch_failed`); 
+        res.redirect(`${FRONTEND_URL}/?error=twitch_failed`); 
     }
 });
 
