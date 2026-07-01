@@ -30,7 +30,7 @@
         <h2>Create Your Account</h2>
         <div class="auth-buttons">
             <button class="auth-btn google">Google</button>
-            <button class="auth-btn github" onclick="window.location.href='/auth/github'">GitHub</button>
+            <button class="auth-btn github" onclick="window.location.href='https://clipwave-backend.onrender.com/auth/github'">GitHub</button>
             <button class="auth-btn twitch">Twitch</button>
         </div>
         <p>Or sign up with email:</p>
@@ -73,7 +73,8 @@
             statusText.innerText = "Transcribing stream... This might take a minute ⏳";
 
             try {
-                const response = await fetch('/api/generate', {
+                // Ensure this fetch also points to your Render backend
+                const response = await fetch('https://clipwave-backend.onrender.com/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ url: urlInput })
