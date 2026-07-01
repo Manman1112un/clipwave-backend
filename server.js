@@ -26,7 +26,7 @@ app.get('/auth/github/callback', async (req, res) => {
     const clientSecret = process.env.GITHUB_CLIENT_SECRET;
     
     // IMPORTANT: Change this to your FRONTEND URL where you want the user to land after logging in
-    const frontendDashboardUrl = 'https://YOUR_FRONTEND_WEBSITE_URL_HERE.com/?authed=true';
+    const frontendDashboardUrl = 'https://YOUR_STACKBLITZ_URL.webcontainer.io';
 
     if (!code) return res.redirect(`${frontendDashboardUrl}&error=no_code_provided`);
 
