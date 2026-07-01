@@ -1,17 +1,40 @@
+console.log("--- STEP 1: SERVER SCRIPT STARTING ---");
+
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
-const ffmpeg = require('fluent-ffmpeg');
-const ffmpegPath = require('ffmpeg-static');
 
-// Initialize FFmpeg with the static binary
-ffmpeg.setFfmpegPath(ffmpegPath);
+console.log("--- STEP 2: BASIC IMPORTS SUCCESSFUL ---");
+
+let ffmpeg;
+let ffmpegPath;
+
+// TRAP 1: Catch FFmpeg configuration errors
+try {
+    ffmpeg = require('fluent-ffmpeg');
+    ffmpegPath = require('ffmpeg-static');
+    console.log("--- STEP 3: FFMPEG PATH FOUND AT:", ffmpegPath, "---");
+    
+    if (ffmpegPath) {
+        ffmpeg.setFfmpegPath(ffmpegPath);
+        console.log("--- STEP 4: FFMPEG CONFIGURED ---");
+    } else {
+        console.log("--- WARNING: FFMPEG PATH IS NULL ---");
+    }
+} catch (err) {
+    console.error("!!! CRITICAL ERROR CONFIGURING FFMPEG:", err.message, "!!!");
+}
 
 const app = express();
 
 app.use(cors({ origin: '*' }));
 app.use(express.json());
+
+// --- HEALTH CHECK ROUTE (Helps Render know the app is alive) ---
+app.get('/', (req, res) => {
+    res.send("ClipWave Backend is Live!");
+});
 
 // --- WE HARDCODE THE FRONTEND URL HERE TO BYPASS RENDER ISSUES ---
 const FRONTEND_URL = "https://stackblitzwebcontainerapistart-21vq--5173--29a3b5f7.local-credentialless.webcontainer.io";
@@ -89,8 +112,21 @@ app.post('/api/generate', async (req, res) => {
     res.json({ message: "AI Analysis Complete!", status: "success" });
 });
 
-// --- THIS IS THE PART YOU WERE MISSING ---
+// TRAP 2: Catch random app crashes
+process.on('uncaughtException', (err) => {
+    console.error("!!! FATAL UNCAUGHT EXCEPTION !!!", err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error("!!! FATAL UNHANDLED REJECTION !!!", reason);
+});
+
+// --- START SERVER ---
 const PORT = process.env.PORT || 10000;
+
+// TRAP 3: Catch port binding errors
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Backend live on port ${PORT}`);
+    console.log(`=== SUCCESS: BACKEND LIVE ON PORT ${PORT} ===`);
+}).on('error', (err) => {
+    console.error("!!! ERROR STARTING SERVER !!!", err.message);
 });
