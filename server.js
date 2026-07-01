@@ -4,69 +4,81 @@ const cors = require('cors');
 const axios = require('axios');
 const app = express();
 
-// --- SECURITY: ALLOW FRONTEND TO TALK TO BACKEND ---
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
-// --- 1. GITHUB OAUTH SIGN-IN FLOW ---
+// --- GITHUB OAUTH ---
 app.get('/auth/github', (req, res) => {
-    const clientId = process.env.GITHUB_CLIENT_ID;
-    const redirectUri = process.env.GITHUB_REDIRECT_URI;
-    
-    if (!clientId) return res.status(500).send("Missing GITHUB_CLIENT_ID.");
-
-    const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user:email`;
+    const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.GITHUB_REDIRECT_URI)}&scope=user:email`;
     res.redirect(githubAuthUrl);
 });
 
 app.get('/auth/github/callback', async (req, res) => {
-    const code = req.query.code; 
-    const clientId = process.env.GITHUB_CLIENT_ID;
-    const clientSecret = process.env.GITHUB_CLIENT_SECRET;
-    
-    // FIXED: Using environment variable instead of a hardcoded URL
- const frontendDashboardUrl = 'https://stackblitzwebcontainerapistart-21vq--5173--29a3b5f7.local-credentialless.webcontainer.io';
-
-    if (!code) return res.redirect(`${frontendDashboardUrl}?error=no_code_provided`);
-
+    const { code } = req.query;
     try {
-        const tokenResponse = await axios.post('https://github.com/login/oauth/access_token', {
-            client_id: clientId,
-            client_secret: clientSecret,
-            code: code
+        const tokenRes = await axios.post('https://github.com/login/oauth/access_token', {
+            client_id: process.env.GITHUB_CLIENT_ID,
+            client_secret: process.env.GITHUB_CLIENT_SECRET,
+            code
         }, { headers: { accept: 'application/json' }});
 
-        const accessToken = tokenResponse.data.access_token;
-        if (!accessToken) return res.redirect(`${frontendDashboardUrl}?error=token_failed`);
-
-        const userResponse = await axios.get('https://api.github.com/user', {
-            headers: { Authorization: `token ${accessToken}` }
+        const userRes = await axios.get('https://api.github.com/user', {
+            headers: { Authorization: `token ${tokenRes.data.access_token}` }
         });
-
-        console.log(`Login Success: ${userResponse.data.login}`);
-        res.redirect(`${frontendDashboardUrl}?authed=true`);
-
-    } catch (error) {
-        console.error("Auth Error:", error.message);
-        res.redirect(`${frontendDashboardUrl}?error=auth_failed`);
+        
+        console.log(`GitHub Login: ${userRes.data.login}`);
+        res.redirect(`${process.env.FRONTEND_URL}/?authed=true`);
+    } catch (e) {
+        res.redirect(`${process.env.FRONTEND_URL}/?error=github_failed`);
     }
 });
 
-// --- 2. AI CLIP GENERATOR ---
+// --- GOOGLE OAUTH ---
+app.get('/auth/google', (req, res) => {
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.GOOGLE_REDIRECT_URI)}&response_type=code&scope=profile email`;
+    res.redirect(url);
+});
+
+app.get('/auth/google/callback', async (req, res) => {
+    try {
+        const tokenRes = await axios.post('https://oauth2.googleapis.com/token', {
+            client_id: process.env.GOOGLE_CLIENT_ID,
+            client_secret: process.env.GOOGLE_CLIENT_SECRET,
+            code: req.query.code,
+            redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+            grant_type: 'authorization_code'
+        });
+        res.redirect(`${process.env.FRONTEND_URL}/?authed=true`);
+    } catch (e) { res.redirect(`${process.env.FRONTEND_URL}/?error=google_failed`); }
+});
+
+// --- TWITCH OAUTH ---
+app.get('/auth/twitch', (req, res) => {
+    const url = `https://id.twitch.tv/oauth2/authorize?client_id=${process.env.TWITCH_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.TWITCH_REDIRECT_URI)}&response_type=code&scope=user:read:email`;
+    res.redirect(url);
+});
+
+app.get('/auth/twitch/callback', async (req, res) => {
+    try {
+        const tokenRes = await axios.post('https://id.twitch.tv/oauth2/token', null, {
+            params: {
+                client_id: process.env.TWITCH_CLIENT_ID,
+                client_secret: process.env.TWITCH_CLIENT_SECRET,
+                code: req.query.code,
+                grant_type: 'authorization_code',
+                redirect_uri: process.env.TWITCH_REDIRECT_URI
+            }
+        });
+        res.redirect(`${process.env.FRONTEND_URL}/?authed=true`);
+    } catch (e) { res.redirect(`${process.env.FRONTEND_URL}/?error=twitch_failed`); }
+});
+
+// --- AI CLIP GENERATOR ---
 app.post('/api/generate', async (req, res) => {
-    const streamUrl = req.body.url;
-    const myGoogleKey = process.env.GOOGLE_API_KEY;
-
-    if (!myGoogleKey) {
-        return res.status(500).json({ error: "Missing Google API Key!" });
-    }
-
     setTimeout(() => {
-        res.json({ message: "AI Analysis Complete! Clips generated.", status: "success" });
+        res.json({ message: "AI Analysis Complete!", status: "success" });
     }, 2500);
 });
 
-// --- 3. START SERVER ---
-// FIXED: Use Render's provided port or default to 10000
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => console.log(`Backend live on port ${PORT}`));
