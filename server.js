@@ -91,3 +91,4 @@ app.post('/api/generate', async (req, res) => {
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => console.log(`Backend live on port ${PORT}`));
+});
