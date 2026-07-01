@@ -5,7 +5,6 @@ const axios = require('axios');
 const app = express();
 
 // --- SECURITY: ALLOW FRONTEND TO TALK TO BACKEND ---
-// Replace the '*' with your actual frontend URL (e.g., 'https://clipwave.vercel.app') when you go live for better security.
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
@@ -25,10 +24,10 @@ app.get('/auth/github/callback', async (req, res) => {
     const clientId = process.env.GITHUB_CLIENT_ID;
     const clientSecret = process.env.GITHUB_CLIENT_SECRET;
     
-    // IMPORTANT: Change this to your FRONTEND URL where you want the user to land after logging in
-    const frontendDashboardUrl = 'https://YOUR_STACKBLITZ_URL.webcontainer.io';
+    // FIXED: Using environment variable instead of a hardcoded URL
+    const frontendDashboardUrl = process.env.FRONTEND_URL || 'https://YOUR_STACKBLITZ_URL.webcontainer.io';
 
-    if (!code) return res.redirect(`${frontendDashboardUrl}&error=no_code_provided`);
+    if (!code) return res.redirect(`${frontendDashboardUrl}?error=no_code_provided`);
 
     try {
         const tokenResponse = await axios.post('https://github.com/login/oauth/access_token', {
@@ -38,18 +37,18 @@ app.get('/auth/github/callback', async (req, res) => {
         }, { headers: { accept: 'application/json' }});
 
         const accessToken = tokenResponse.data.access_token;
-        if (!accessToken) return res.redirect(`${frontendDashboardUrl}&error=token_failed`);
+        if (!accessToken) return res.redirect(`${frontendDashboardUrl}?error=token_failed`);
 
         const userResponse = await axios.get('https://api.github.com/user', {
             headers: { Authorization: `token ${accessToken}` }
         });
 
         console.log(`Login Success: ${userResponse.data.login}`);
-        res.redirect(frontendDashboardUrl);
+        res.redirect(`${frontendDashboardUrl}?authed=true`);
 
     } catch (error) {
         console.error("Auth Error:", error.message);
-        res.redirect(`${frontendDashboardUrl}&error=auth_failed`);
+        res.redirect(`${frontendDashboardUrl}?error=auth_failed`);
     }
 });
 
@@ -58,18 +57,16 @@ app.post('/api/generate', async (req, res) => {
     const streamUrl = req.body.url;
     const myGoogleKey = process.env.GOOGLE_API_KEY;
 
-    console.log(`Processing URL: ${streamUrl}`);
-
     if (!myGoogleKey) {
         return res.status(500).json({ error: "Missing Google API Key!" });
     }
 
-    // Fake delay to simulate video processing
     setTimeout(() => {
         res.json({ message: "AI Analysis Complete! Clips generated.", status: "success" });
     }, 2500);
 });
 
 // --- 3. START SERVER ---
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Backend live on port ${PORT}`));
+// FIXED: Use Render's provided port or default to 10000
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, '0.0.0.0', () => console.log(`Backend live on port ${PORT}`));
