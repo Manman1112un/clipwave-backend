@@ -2,6 +2,12 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
+const ffmpeg = require('fluent-ffmpeg');
+const ffmpegPath = require('ffmpeg-static');
+
+// Initialize FFmpeg with the static binary
+ffmpeg.setFfmpegPath(ffmpegPath);
+
 const app = express();
 
 app.use(cors({ origin: '*' }));
