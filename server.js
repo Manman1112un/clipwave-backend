@@ -7,7 +7,7 @@ const app = express();
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
-// --- GITHUB OAUTH ---
+// --- 1. GITHUB OAUTH ---
 app.get('/auth/github', (req, res) => {
     const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.GITHUB_REDIRECT_URI)}&scope=user:email`;
     res.redirect(githubAuthUrl);
@@ -33,10 +33,10 @@ app.get('/auth/github/callback', async (req, res) => {
     }
 });
 
-// --- GOOGLE OAUTH ---
+// --- 2. GOOGLE OAUTH (NOW ADDED) ---
 app.get('/auth/google', (req, res) => {
-    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.GOOGLE_REDIRECT_URI)}&response_type=code&scope=profile email`;
-    res.redirect(url);
+    const googleUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.GOOGLE_REDIRECT_URI)}&response_type=code&scope=profile email`;
+    res.redirect(googleUrl);
 });
 
 app.get('/auth/google/callback', async (req, res) => {
@@ -49,13 +49,16 @@ app.get('/auth/google/callback', async (req, res) => {
             grant_type: 'authorization_code'
         });
         res.redirect(`${process.env.FRONTEND_URL}/?authed=true`);
-    } catch (e) { res.redirect(`${process.env.FRONTEND_URL}/?error=google_failed`); }
+    } catch (e) { 
+        console.error("Google Auth Error:", e.response ? e.response.data : e.message);
+        res.redirect(`${process.env.FRONTEND_URL}/?error=google_failed`); 
+    }
 });
 
-// --- TWITCH OAUTH ---
+// --- 3. TWITCH OAUTH (NOW ADDED) ---
 app.get('/auth/twitch', (req, res) => {
-    const url = `https://id.twitch.tv/oauth2/authorize?client_id=${process.env.TWITCH_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.TWITCH_REDIRECT_URI)}&response_type=code&scope=user:read:email`;
-    res.redirect(url);
+    const twitchUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${process.env.TWITCH_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.TWITCH_REDIRECT_URI)}&response_type=code&scope=user:read:email`;
+    res.redirect(twitchUrl);
 });
 
 app.get('/auth/twitch/callback', async (req, res) => {
@@ -70,10 +73,13 @@ app.get('/auth/twitch/callback', async (req, res) => {
             }
         });
         res.redirect(`${process.env.FRONTEND_URL}/?authed=true`);
-    } catch (e) { res.redirect(`${process.env.FRONTEND_URL}/?error=twitch_failed`); }
+    } catch (e) { 
+        console.error("Twitch Auth Error:", e.response ? e.response.data : e.message);
+        res.redirect(`${process.env.FRONTEND_URL}/?error=twitch_failed`); 
+    }
 });
 
-// --- AI CLIP GENERATOR ---
+// --- 4. AI CLIP GENERATOR ---
 app.post('/api/generate', async (req, res) => {
     setTimeout(() => {
         res.json({ message: "AI Analysis Complete!", status: "success" });
