@@ -32,7 +32,7 @@ app.get('/', (req, res) => {
     res.send("ClipWave Backend is Live!");
 });
 
-const FRONTEND_URL = "https://stackblitzwebcontainerapistart-21vq--5173--29a3b5f7.local-credentialless.webcontainer.io";
+const FRONTEND_URL = "https://stackblitzwebcontainerapistart-xmi0--5173--29a3b5f7.local-credentialless.webcontainer.io";
 
 // --- OAUTH ROUTES ---
 app.get('/auth/github', (req, res) => {
@@ -121,3 +121,4 @@ app.post('/api/generate', async (req, res) => {
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => console.log(`=== BACKEND LIVE ON PORT ${PORT} ===`));
+
