@@ -1,3 +1,4 @@
+
 console.log("--- STEP 1: SERVER SCRIPT STARTING ---");
 
 require('dotenv').config();
@@ -9,7 +10,6 @@ const fs = require('fs');
 
 console.log("--- STEP 2: BASIC IMPORTS SUCCESSFUL ---");
 
-// AWS S3 Setup
 const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 
 const s3 = new S3Client({
@@ -20,12 +20,11 @@ const s3 = new S3Client({
     }
 });
 
-const S3_BUCKET = process.env.AWS_BUCKET_NAME || 'clipwave-clips';
+const S3_BUCKET = process.env.AWS_BUCKET_NAME || 'clipwave-clips-dan';
 const S3_REGION = process.env.AWS_REGION || 'us-east-1';
 
 console.log("--- STEP 3: AWS S3 CONFIGURED (Bucket:", S3_BUCKET, ") ---");
 
-// FFmpeg Setup
 let ffmpeg;
 let ffmpegPath;
 
@@ -41,7 +40,6 @@ try {
     console.error("!!! CRITICAL ERROR CONFIGURING FFMPEG:", err.message, "!!!");
 }
 
-// yt-dlp Setup
 let ytdlp;
 try {
     ytdlp = require('yt-dlp-exec');
@@ -54,7 +52,6 @@ const app = express();
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
-// Create temp output directory for processing
 const OUTPUT_DIR = path.join(__dirname, 'clips');
 if (!fs.existsSync(OUTPUT_DIR)) {
     fs.mkdirSync(OUTPUT_DIR, { recursive: true });
@@ -66,30 +63,18 @@ app.get('/', (req, res) => {
 
 const FRONTEND_URL = "https://stackblitzwebcontainerapistart-xmi0--5173--29a3b5f7.local-credentialless.webcontainer.io";
 
-// ========================
-// === HELPER FUNCTIONS ===
-// ========================
-
-// Upload a file to S3 and return the public URL
 async function uploadToS3(filePath, s3Key, contentType) {
     const fileBuffer = fs.readFileSync(filePath);
-    
     const command = new PutObjectCommand({
         Bucket: S3_BUCKET,
         Key: s3Key,
         Body: fileBuffer,
-        ContentType: contentType,
-        // Make the file publicly readable
-        ACL: 'public-read'
+        ContentType: contentType
     });
-
     await s3.send(command);
-    
-    // Return the public URL
     return `https://${S3_BUCKET}.s3.${S3_REGION}.amazonaws.com/${s3Key}`;
 }
 
-// Delete a file from S3
 async function deleteFromS3(s3Key) {
     const command = new DeleteObjectCommand({
         Bucket: S3_BUCKET,
@@ -98,7 +83,6 @@ async function deleteFromS3(s3Key) {
     await s3.send(command);
 }
 
-// Convert "M:SS" or "H:MM:SS" to seconds
 function timeToSeconds(timeStr) {
     const parts = timeStr.split(':').map(Number);
     if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
@@ -106,7 +90,6 @@ function timeToSeconds(timeStr) {
     return parts[0];
 }
 
-// Generate SRT file content from caption data
 function generateSRT(captions) {
     let srt = '';
     captions.forEach((cap, i) => {
@@ -117,7 +100,6 @@ function generateSRT(captions) {
     return srt;
 }
 
-// Format seconds to SRT timestamp (HH:MM:SS,mmm)
 function secondsToSRT(sec) {
     const h = Math.floor(sec / 3600);
     const m = Math.floor((sec % 3600) / 60);
@@ -125,10 +107,6 @@ function secondsToSRT(sec) {
     const ms = Math.round((sec % 1) * 1000);
     return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')},${String(ms).padStart(3,'0')}`;
 }
-
-// ====================
-// === OAUTH ROUTES ===
-// ====================
 
 app.get('/auth/github', (req, res) => {
     const redirectUri = "https://clipwave-backend.onrender.com/auth/github/callback";
@@ -194,10 +172,6 @@ app.get('/auth/twitch/callback', async (req, res) => {
     }
 });
 
-// ===============================
-// === AI TEXT GENERATION ROUTE ===
-// ===============================
-
 app.post('/api/generate', async (req, res) => {
     try {
         const { prompt } = req.body;
@@ -218,10 +192,6 @@ app.post('/api/generate', async (req, res) => {
     }
 });
 
-// ============================================
-// === FULL VIDEO CLIPPING PIPELINE (S3)   ===
-// ============================================
-
 app.post('/api/clip', async (req, res) => {
     const { url, clips, aspectRatio, captionLang } = req.body;
 
@@ -234,9 +204,6 @@ app.post('/api/clip', async (req, res) => {
     fs.mkdirSync(jobDir, { recursive: true });
 
     try {
-        // ============================
-        // STEP 1: Download video
-        // ============================
         console.log(`[JOB ${jobId}] Downloading: ${url}`);
         const videoPath = path.join(jobDir, 'source.mp4');
 
@@ -253,9 +220,6 @@ app.post('/api/clip', async (req, res) => {
             throw new Error("Video download failed - file not found");
         }
 
-        // ============================
-        // STEP 2: Extract audio
-        // ============================
         console.log(`[JOB ${jobId}] Extracting audio...`);
         const audioPath = path.join(jobDir, 'audio.wav');
 
@@ -270,9 +234,6 @@ app.post('/api/clip', async (req, res) => {
                 .run();
         });
 
-        // ============================
-        // STEP 3: Process each clip
-        // ============================
         const results = [];
 
         for (let i = 0; i < clips.length; i++) {
@@ -286,9 +247,8 @@ app.post('/api/clip', async (req, res) => {
                 continue;
             }
 
-            console.log(`[JOB ${jobId}] Processing clip ${i + 1}: ${clip.start_time} → ${clip.end_time}`);
+            console.log(`[JOB ${jobId}] Processing clip ${i + 1}: ${clip.start_time} - ${clip.end_time}`);
 
-            // --- Extract clip audio for transcription ---
             const clipAudioPath = path.join(jobDir, `clip_${i}_audio.wav`);
             await new Promise((resolve, reject) => {
                 ffmpeg(audioPath)
@@ -300,7 +260,6 @@ app.post('/api/clip', async (req, res) => {
                     .run();
             });
 
-            // --- Transcribe with Gemini ---
             let captions = [];
             try {
                 const audioBuffer = fs.readFileSync(clipAudioPath);
@@ -330,7 +289,7 @@ app.post('/api/clip', async (req, res) => {
                 if (transcriptText.startsWith('```')) {
                     transcriptText = transcriptText.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
                 }
-                
+
                 const rawCaptions = JSON.parse(transcriptText);
                 captions = rawCaptions.map(c => ({
                     start: secondsToSRT(c.start),
@@ -346,11 +305,9 @@ app.post('/api/clip', async (req, res) => {
                 }];
             }
 
-            // --- Write SRT file ---
             const srtPath = path.join(jobDir, `clip_${i}.srt`);
             fs.writeFileSync(srtPath, generateSRT(captions));
 
-            // --- Cut video & burn captions with FFmpeg ---
             const clipOutputPath = path.join(jobDir, `clip_${i}.mp4`);
 
             let videoFilter = '';
@@ -385,9 +342,6 @@ app.post('/api/clip', async (req, res) => {
 
             console.log(`[JOB ${jobId}] Clip ${i + 1} rendered. Uploading to S3...`);
 
-            // ============================
-            // STEP 4: Upload to S3
-            // ============================
             const s3VideoKey = `clips/${jobId}/clip_${i}.mp4`;
             const s3SrtKey = `clips/${jobId}/clip_${i}.srt`;
 
@@ -407,22 +361,17 @@ app.post('/api/clip', async (req, res) => {
                 captions: captions
             });
 
-            // Clean up local clip audio
             if (fs.existsSync(clipAudioPath)) fs.unlinkSync(clipAudioPath);
         }
 
-        // ============================
-        // STEP 5: Clean up local files
-        // ============================
         console.log(`[JOB ${jobId}] Cleaning up local files...`);
         fs.rmSync(jobDir, { recursive: true, force: true });
 
-        console.log(`[JOB ${jobId}] ✅ DONE. ${results.length} clips uploaded to S3.`);
+        console.log(`[JOB ${jobId}] DONE. ${results.length} clips uploaded to S3.`);
         res.json({ status: "success", jobId, clips: results });
 
     } catch (error) {
         console.error(`[JOB ${jobId}] Pipeline error:`, error.message);
-        // Clean up on error
         if (fs.existsSync(jobDir)) {
             fs.rmSync(jobDir, { recursive: true, force: true });
         }
@@ -430,17 +379,14 @@ app.post('/api/clip', async (req, res) => {
     }
 });
 
-// === DELETE CLIPS FROM S3 ===
 app.delete('/api/clips/:jobId', async (req, res) => {
     try {
         const jobId = req.params.jobId;
-        // Delete up to 10 clips per job (covers most cases)
         for (let i = 0; i < 10; i++) {
             try {
                 await deleteFromS3(`clips/${jobId}/clip_${i}.mp4`);
                 await deleteFromS3(`clips/${jobId}/clip_${i}.srt`);
             } catch (e) {
-                // File doesn't exist, that's fine
                 break;
             }
         }
@@ -452,6 +398,4 @@ app.delete('/api/clips/:jobId', async (req, res) => {
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => console.log(`=== BACKEND LIVE ON PORT ${PORT} (S3 ENABLED) ===`));
-
-
 
