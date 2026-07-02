@@ -10,7 +10,6 @@ console.log("--- STEP 2: BASIC IMPORTS SUCCESSFUL ---");
 let ffmpeg;
 let ffmpegPath;
 
-// TRAP 1: Catch FFmpeg configuration errors
 try {
     ffmpeg = require('fluent-ffmpeg');
     ffmpegPath = require('ffmpeg-static');
@@ -19,8 +18,6 @@ try {
     if (ffmpegPath) {
         ffmpeg.setFfmpegPath(ffmpegPath);
         console.log("--- STEP 4: FFMPEG CONFIGURED ---");
-    } else {
-        console.log("--- WARNING: FFMPEG PATH IS NULL ---");
     }
 } catch (err) {
     console.error("!!! CRITICAL ERROR CONFIGURING FFMPEG:", err.message, "!!!");
@@ -31,15 +28,13 @@ const app = express();
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
-// --- HEALTH CHECK ROUTE (Helps Render know the app is alive) ---
 app.get('/', (req, res) => {
     res.send("ClipWave Backend is Live!");
 });
 
-// --- WE HARDCODE THE FRONTEND URL HERE TO BYPASS RENDER ISSUES ---
 const FRONTEND_URL = "https://stackblitzwebcontainerapistart-21vq--5173--29a3b5f7.local-credentialless.webcontainer.io";
 
-// --- 1. GITHUB OAUTH ---
+// --- OAUTH ROUTES ---
 app.get('/auth/github', (req, res) => {
     const redirectUri = "https://clipwave-backend.onrender.com/auth/github/callback";
     const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user:email`;
@@ -54,14 +49,12 @@ app.get('/auth/github/callback', async (req, res) => {
             code: req.query.code,
             redirect_uri: "https://clipwave-backend.onrender.com/auth/github/callback"
         }, { headers: { accept: 'application/json' }});
-
         res.redirect(`${FRONTEND_URL}/?authed=true`);
     } catch (e) {
         res.redirect(`${FRONTEND_URL}/?error=github_failed`);
     }
 });
 
-// --- 2. GOOGLE OAUTH ---
 app.get('/auth/google', (req, res) => {
     const redirectUri = "https://clipwave-backend.onrender.com/auth/google/callback";
     const googleUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=profile email`;
@@ -83,7 +76,6 @@ app.get('/auth/google/callback', async (req, res) => {
     }
 });
 
-// --- 3. TWITCH OAUTH ---
 app.get('/auth/twitch', (req, res) => {
     const redirectUri = "https://clipwave-backend.onrender.com/auth/twitch/callback";
     const twitchUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${process.env.TWITCH_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=user:read:email`;
@@ -107,66 +99,25 @@ app.get('/auth/twitch/callback', async (req, res) => {
     }
 });
 
-// --- 4. REAL AI GENERATOR ---
+// --- GENERATOR ROUTE ---
 app.post('/api/generate', async (req, res) => {
     try {
         const { prompt } = req.body;
+        if (!prompt) return res.status(400).json({ error: "No prompt provided" });
 
-        if (!prompt) {
-            return res.status(400).json({ error: "No prompt provided in request body" });
-        }
-
-        // We use the GEMINI_API_KEY from your environment variables
         const apiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey) {
-            return res.status(500).json({ error: "AI API key is missing on the server configuration" });
-        }
-
-        // Call the Gemini API directly using axios
         const response = await axios.post(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-            {
-                contents: [{ parts: [{ text: prompt }] }]
-            },
-            {
-                headers: { 'Content-Type': 'application/json' }
-            }
+            { contents: [{ parts: [{ text: prompt }] }] },
+            { headers: { 'Content-Type': 'application/json' } }
         );
 
-        // Extract the text response from Gemini's JSON structure
         const aiResponse = response.data.candidates[0].content.parts[0].text;
-
-        // Send it back to your frontend!
-        res.json({ 
-            status: "success", 
-            message: aiResponse 
-        });
-
+        res.json({ status: "success", message: aiResponse });
     } catch (error) {
-        console.error("AI Generation Error:", error.response?.data || error.message);
-        res.status(500).json({ 
-            status: "error", 
-            message: "Failed to generate AI response",
-            details: error.message 
-        });
+        res.status(500).json({ status: "error", message: "Failed to generate" });
     }
 });
 
-// TRAP 2: Catch random app crashes
-process.on('uncaughtException', (err) => {
-    console.error("!!! FATAL UNCAUGHT EXCEPTION !!!", err);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-    console.error("!!! FATAL UNHANDLED REJECTION !!!", reason);
-});
-
-// --- START SERVER ---
 const PORT = process.env.PORT || 10000;
-
-// TRAP 3: Catch port binding errors
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`=== SUCCESS: BACKEND LIVE ON PORT ${PORT} ===`);
-}).on('error', (err) => {
-    console.error("!!! ERROR STARTING SERVER !!!", err.message);
-});
+app.listen(PORT, '0.0.0.0', () => console.log(`=== BACKEND LIVE ON PORT ${PORT} ===`));
